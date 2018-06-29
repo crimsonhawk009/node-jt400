@@ -1,5 +1,7 @@
 import { jt400 as connection } from './db'
-import { pool, connect } from '../lib/jt400'
+// import { pool, connect } from '../lib/jt400'
+const pool = require('../lib/jt400').pool;
+const connect = require('../lib/jt400').connect;
 import { expect } from 'chai'
 import { readFileSync } from 'fs'
 
@@ -83,7 +85,7 @@ describe('jt400 pool', function() {
 	it('should insert dates and timestamps', () => {
 		const params = [new Date(2014, 0, 15), new Date(2014, 0, 16, 15, 32, 5), 'bar'];
 		return connection.update('update tsttbl set fra=?, timi=? where foo=?', params).then(() => {
-			return connection.query<any>('select fra, timi from tsttbl where foo=?', ['bar']);
+			return connection.query('select fra, timi from tsttbl where foo=?', ['bar']);
 		}).then(res => {
 			expect(res[0].FRA).to.eql('2014-01-15');
 			expect(res[0].TIMI).to.eql('2014-01-16 15:32:05.000000');

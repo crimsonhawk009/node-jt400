@@ -1,5 +1,6 @@
 'use strict';
-import { useInMemoryDb } from '../lib/jt400'
+// import { useInMemoryDb } from '../lib/jt400'
+const useInMemoryDb = require('../lib/jt400').useInMemoryDb
 import { Readable } from 'stream';
 import { parse } from 'JSONStream';
 import { expect } from 'chai';
@@ -27,7 +28,7 @@ describe('hsql in memory', () => {
         });
 
         it('should use column alias when selecting', async () => {
-            const res = await jt400.query<any>('select ID, NAME MYNAME from testtbl');                
+            const res = await jt400.query('select ID, NAME MYNAME from testtbl');                
             expect(res[0]).to.have.property('MYNAME');
         });
 
@@ -356,7 +357,7 @@ describe('hsql in memory', () => {
                     return transaction.update("update testtbl set NAME='Transaction 2' where id=?", [rowId]);
                 });
             })
-            .then(() => jt400.query<any>('select NAME from testtbl where id=?', [rowId]))            
+            .then(() => jt400.query('select NAME from testtbl where id=?', [rowId]))            
             .then(res => {
                 expect(res[0].NAME).to.eql('Transaction 2');
             })
