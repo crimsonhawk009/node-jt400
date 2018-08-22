@@ -3,6 +3,7 @@ import { JdbcStream } from './jdbcstream'
 import { ifs as createIfs } from './ifs'
 import { toInsertSql } from './sqlutil'
 import { createJdbcWriteStream } from './jdbcwritestream'
+import { jt400Error } from './errors';
 import JSONStream = require('JSONStream')
 import { defaults } from './defaults'
 import Q = require('q')
@@ -84,9 +85,19 @@ function paramsToJson(params) {
 function createInstance(connection, insertListFun, inMemory) {
 	var mixinConnection = function(obj, newConn?) {
 		var thisConn = newConn || connection;
-		obj.query = function(sql, params) {
-			var jsonParams = paramsToJson(params || []);
-			return Q.nfcall(thisConn.query, sql, jsonParams).then(JSON.parse);
+		obj.query = async function(sql, params) {
+			const jsonParams = paramsToJson(params || []);
+			return new Promise((resolve, reject) => {
+				thisConn.query(sql, jsonParams, (err, result) => {
+					if (err) {
+						reject(new jt400Error(err));
+					}
+					else {
+						const json = JSON.parse(result);
+						resolve(json);
+					}
+				});
+			});
 		};
 		obj.createReadStream = function(sql, params) {
 			var jsonParams = paramsToJson(params || []);
@@ -137,7 +148,16 @@ function createInstance(connection, insertListFun, inMemory) {
 		};
 		obj.update = function(sql, params) {
 			var jsonParams = paramsToJson(params || []);
-			return Q.nfcall(thisConn.update, sql, jsonParams);
+			return new Promise((resolve, reject) => {
+				thisConn.update(sql, jsonParams, (err, result) => {
+					if (err) {
+						reject(new jt400Error(err));
+					}
+					else {
+						resolve(result);
+					}
+				});
+			});
 		};
 		obj.createWriteStream = function(sql, options) {
 			return createJdbcWriteStream(obj.batchUpdate, sql, options && options.bufferSize);
@@ -146,11 +166,20 @@ function createInstance(connection, insertListFun, inMemory) {
 			var jsonParams = JSON.stringify((paramsList || []).map(function(row) {
 				return row.map(convertDateValues);
 			}));
-			return Q.nfcall(thisConn.batchUpdate, sql, jsonParams).then(res => Array.from(res));			
+			return Q.nfcall(thisConn.batchUpdate, sql, jsonParams).then(res => Array.from(res));
 		};
-		obj.insertAndGetId = function(sql, params) {			
+		obj.insertAndGetId = function(sql, params) {
 			var jsonParams = paramsToJson(params || []);
-			return Q.nfcall(thisConn.insertAndGetId, sql, jsonParams);
+			return new Promise((resolve, reject) => {
+				thisConn.insertAndGetId(sql, jsonParams, (err, result) => {
+					if (err) {
+						reject(new jt400Error(err));
+					}
+					else {
+						resolve(result);
+					}
+				});
+			});
 		};
 		obj.insertList = function(tableName, idColumn, list) {
 			return insertListFun(obj, tableName, idColumn, list);
@@ -392,6 +421,8 @@ export function initialize(java?: nodeJava) {
 	if (!jvm.asyncOptions) {
 		jvm.asyncOptions = asyncOptions;
 	}
+	// Do not prompt for user or password via GUI
+	jvm.options.push('-Dcom.ibm.as400.access.AS400.guiAvailable=false')
 	
 	jvm.options.push('-Xrs'); // fixing the signal handling issues (for exmaple ctrl-c)
 
